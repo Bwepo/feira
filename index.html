@@ -1,133 +1,68 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html>
 <head>
   <meta charset="UTF-8" />
+  <title>Ver feira no app</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Abrir no Bwepo</title>
-  <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;margin:0;padding:24px;background:#0b0b0c;color:#f2f2f2;display:flex;min-height:100vh;align-items:center;justify-content:center}
-    .card{max-width:560px;width:100%;background:#141416;border:1px solid #222328;border-radius:16px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
-    h1{font-size:20px;margin:0 0 12px}
-    p{opacity:.9;line-height:1.5}
-    .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-    .btn{flex:1 1 180px;padding:14px 16px;border-radius:10px;border:1px solid #2a2b2f;background:#1f2024;color:#fff;font-weight:700;cursor:pointer}
-    .btn.primary{background:#007aff;border-color:#297dff}
-    .btn.store{background:#202225}
-    .note{font-size:13px;opacity:.75;margin-top:10px}
-  </style>
   <script>
-    // --- Config das lojas (atualizado p/ seu app)
-    const PLAY_STORE = 'https://play.google.com/store/apps/details?id=com.azura.bwepodois';
-    const APP_STORE  = 'https://apps.apple.com/br/app/bwepo/id6743187782';
+    function getQueryParam(param) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(param);
+    }
 
-    // --- Helpers
-    function qs(name){
-      const u = new URL(window.location.href);
-      return u.searchParams.get(name);
-    }
-    function getTypeAndId(){
-      const u = new URL(window.location.href);
-      const path = (u.pathname || '').toLowerCase();
-      const segs = path.split('/').filter(Boolean); // ex: ['feira'] ['infocomunidades','XYZ']
-      // 1) por query
-      let type = (qs('type') || '').toLowerCase(); // 'feira' | 'comunidade'
-      let id   = qs('id') || '';
-      // 2) por path
-      if (!type){
-        if (segs[0] === 'feira') type = 'feira';
-        if (segs[0] === 'comunidade' || segs[0] === 'infocomunidades') type = 'comunidade';
-      }
-      if (!id){
-        if (segs.length >= 2) id = segs[1];
-      }
-      return { type, id };
-    }
-    function buildDeepLink(type,id){
-      if (type === 'feira') return `bwepo://feira/${id}`;
-      // default comunidade
-      return `bwepo://infocomunidades/${id}`;
-    }
-    function isAndroid(){ return /android/i.test(navigator.userAgent); }
-    function isIOS(){ return /iPhone|iPad|iPod/i.test(navigator.userAgent); }
-    function isMobile(){ return isAndroid() || isIOS(); }
+    const fairId = getQueryParam('id');
 
-    async function openAppFlow(deepLink){
-      if (isAndroid()){
-        // Tenta abrir app; se não abrir, Play Store (timeout simples)
+    if (fairId) {
+      const deepLink = `bwepo://feira/${fairId}`;
+      // Mantive os mesmos links de loja que você usa em /comunidades (já está ok no seu ambiente)
+      const androidStore = 'https://play.google.com/store/apps/details?id=com.azura.bwepodois&hl=pt_BR';
+      const iosStore = 'https://apps.apple.com/br/app/bwepo/id6743187782';
+
+      const isAndroid = /android/i.test(navigator.userAgent);
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+      if (isAndroid) {
+        // tenta abrir o app; se não, cai na Play Store
         window.location.href = deepLink;
-        setTimeout(()=>{ window.location.href = PLAY_STORE; }, 1600);
-        return;
-        // (Se quiser usar intent:// do Chrome, pode trocar por:
-        // window.location.href = `intent://${deepLink.replace('://','/')}#Intent;scheme=bwepo;package=com.azura.bwepodois;S.browser_fallback_url=${encodeURIComponent(PLAY_STORE)};end`;
+        setTimeout(() => {
+          window.location.href = androidStore;
+        }, 2000);
+      } else if (isIOS) {
+        // iOS: precisa de gesto do usuário; mostra botão
+        document.addEventListener('DOMContentLoaded', () => {
+          const button = document.createElement('button');
+          button.innerText = 'Abrir no app';
+          button.style.padding = '1rem';
+          button.style.fontSize = '1.2rem';
+          button.style.borderRadius = '8px';
+          button.style.background = '#ff40a0';
+          button.style.color = 'white';
+          button.style.border = 'none';
+          button.style.cursor = 'pointer';
+
+          button.onclick = () => {
+            window.location = deepLink;
+            setTimeout(() => {
+              window.location = iosStore;
+            }, 2000);
+          };
+
+          document.body.innerHTML = '<p>Para continuar, toque no botão abaixo:</p>';
+          document.body.appendChild(button);
+        });
+      } else {
+        document.addEventListener('DOMContentLoaded', () => {
+          document.body.innerHTML = "<p>Por favor, abra este link em um dispositivo móvel.</p>";
+        });
       }
-      if (isIOS()){
-        // iOS precisa de gesto do usuário idealmente → usamos botão.
-        // Mas se quiser tentar auto-open ao carregar:
-        window.location = deepLink;
-        setTimeout(()=>{ window.location = APP_STORE; }, 1600);
-        return;
-      }
-      // Desktop
-      document.getElementById('msg').innerHTML = 'Abra este link no seu celular para continuar.';
+    } else {
+      document.addEventListener('DOMContentLoaded', () => {
+        document.body.innerHTML = '<p>Erro: Feira não encontrada. Verifique o link.</p>';
+      });
     }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      const { type, id } = getTypeAndId();
-      const valid = !!type && !!id;
-      const title = document.getElementById('title');
-      const msg = document.getElementById('msg');
-      const btnOpen = document.getElementById('btn-open');
-      const btnStore = document.getElementById('btn-store');
-
-      if (!valid){
-        title.textContent = 'Link inválido';
-        msg.textContent = 'Parâmetros ausentes. Verifique se o link contém ?id=...';
-        btnOpen.style.display = 'none';
-        btnStore.style.display = 'none';
-        return;
-      }
-
-      // Define rótulo conforme tipo
-      const isFeira = (type === 'feira');
-      title.textContent = isFeira ? 'Abrir Feira no app' : 'Abrir Comunidade no app';
-      msg.textContent = isMobile()
-        ? 'Toque em “Abrir no app”. Se não abrir, você será levado à loja para instalar o Bwepo.'
-        : 'Parece que você está no computador. Abra este link no seu celular para continuar.';
-
-      const deepLink = buildDeepLink(type, id);
-
-      // Botões
-      btnOpen.onclick = () => {
-        if (isAndroid()){
-          window.location.href = deepLink;
-          setTimeout(()=>{ window.location.href = PLAY_STORE; }, 1600);
-        } else if (isIOS()){
-          window.location = deepLink;
-          setTimeout(()=>{ window.location = APP_STORE; }, 1600);
-        } else {
-          msg.textContent = 'Abra no celular para continuar.';
-        }
-      };
-      btnStore.onclick = () => {
-        window.location.href = isAndroid() ? PLAY_STORE : APP_STORE;
-      };
-
-      // Auto-open em Android (boa UX); no iOS deixamos o botão visível
-      if (isAndroid()){
-        setTimeout(()=> btnOpen.click(), 50);
-      }
-    });
   </script>
 </head>
 <body>
-  <div class="card">
-    <h1 id="title">Abrindo…</h1>
-    <p id="msg">Preparando o redirecionamento.</p>
-    <div class="row">
-      <button id="btn-open" class="btn primary">Abrir no app</button>
-      <button id="btn-store" class="btn store">Ir para a loja</button>
-    </div>
-    <p class="note">Dica: se nada acontecer, instale/atualize o Bwepo na loja e volte a tocar no botão.</p>
-  </div>
+  <p>Carregando...</p>
 </body>
 </html>
